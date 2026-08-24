@@ -44,7 +44,36 @@
 # "publickey password,keyboard-interactive". Drop the second alternative
 # once the key works if the site wants youruser on pubkey only.
 #
-
+# CENTRAL KEY DIRECTORY. The AuthorizedKeysFile below names two paths and
+# sshd reads them in order:
+#   1. /etc/ssh/authorized_keys/%u   — root-owned, on local disk, label etc_t
+#   2. .ssh/authorized_keys — the user's own copy, in their home
+# WHY THIS EXISTS: with SELinux enforcing and the use_nfs_home_dirs
+# boolean off, sshd_t cannot read an authorized_keys that lives on an NFS
+# home (the file is labelled nfs_t). Pubkey login fails with "Could not
+# open user ... authorized keys ... Permission denied" in /var/log/secure
+# and an AVC per attempt. restorecon cannot relabel an NFS mount, so the
+# key has to live on a path sshd can always read.
+# WHY CENTRAL IS FIRST: every login that consults an unreadable NFS path
+# first writes three denied lines to /var/log/secure and three AVCs, and
+# a hung hard NFS mount named first would stall authentication itself.
+# WHY THE HOME PATH STAYS SECOND: the same file then keeps working
+# unchanged on hosts whose homes are local, so there is nothing to undo
+# if this user moves or the mount changes.
+# WHAT sshd REQUIRES of the file (StrictModes): owned by root or by
+# youruser, and not group- or world-writable. 0644 root:root is what
+# --install-authorized-key writes; the directory is 0755 root:root.
+# AuthorizedKeysCommand (FreeIPA: sss_ssh_authorizedkeys) is a separate
+# mechanism and is untouched by this file.
+  else
+    keys_note=# THE KEY ITSELF is not configured here: either
+# ~youruser/.ssh/authorized_keys (0600, ~/.ssh 0700, plus
+# restorecon -Rv ~/.ssh on SELinux) or the realm's own store when sshd
+# resolves keys through AuthorizedKeysCommand (FreeIPA:
+# sss_ssh_authorizedkeys). AuthorizedKeysFile is left alone so neither
+# arrangement is disturbed. On a host whose homes are on NFS with
+# SELinux enforcing, sshd cannot read the home copy at all — see
+# --central-keys and --install-authorized-key.
 #
 # NOT SETTABLE PER USER: PerSourcePenaltyExemptList (OpenSSH 9.9+ bans a
 # client IP after a hung OTP prompt) is global-only. If operators get
@@ -53,6 +82,7 @@
 Match User youruser
     PubkeyAuthentication yes
     AuthenticationMethods publickey keyboard-interactive
+    AuthorizedKeysFile /etc/ssh/authorized_keys/%u .ssh/authorized_keys
     # Remote-SSH tunnels its server over the session. Both are sshd
     # defaults, restated for youruser in case the baseline turns them off.
     AllowTcpForwarding yes
