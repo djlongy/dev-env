@@ -22,8 +22,9 @@ fonts. `install.sh` never touches a network, a package manager, or git.
   LICENSE.
 - `tmux/` — the stow package with `.tmux.conf` and the `tmx-*` helper scripts.
 - `tools/` — standalone extras that are not part of `install.sh`:
-  `tools/vscode-airgap/` (VS Code Server on hosts with no internet) and
   `tools/ohmybash/` (interactive/remote prompt deploy + font helper).
+  VS Code Server for hosts with no internet is its own repo,
+  `github.com/djlongy/vscode-airgap`.
 
 ## Requirements
 
